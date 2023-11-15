@@ -2,21 +2,20 @@ import base64
 import json
 import os
 import re
+import string
 import threading
 import time
-from urllib.parse import urljoin, urlparse
 
-import openai as openai
 import requests as requests
-from bs4 import BeautifulSoup
 from github import GithubException, Github
 from openai import OpenAI
 
 
 def user_input_thread():
     global should_exit
-    user_input = input("Digita \"si\" per uscire: ")
-    if user_input == "si" or user_input == "Si" or user_input == "SI" or user_input == "yes" or user_input == "Yes" or user_input == "YES":
+    user_input = input("Type \"yes\" to stop: ")
+    if user_input == "si" or user_input == "Si" or user_input == "SI" or user_input == "yes" or user_input == "Yes" or \
+            user_input == "YES":
         should_exit = True
         print("Quitting...")
 
@@ -27,29 +26,28 @@ def is_valid_github_username(username):
     return response.status_code == 200
 
 
-# Verifica l'efficacia di un token GitHub
+# testing the GitHub token
 def is_valid_github_token(token, repository_name):
     try:
         g = Github(token)
         repo = g.get_user().get_repo(repository_name)
 
-        # Prova a creare un file di test
+        # it tries to create a test file
         try:
             repo.create_file("test.txt", "Creating test file", "test content")
         except GithubException as e:
             if e.status == 422 and "sha" in str(e):
-                # Ignora l'errore "Invalid request. \"sha\" wasn't supplied."
+                # ignore the error "Invalid request. \"sha\" wasn't supplied."
                 pass
             else:
                 raise
 
-        # Prova a rimuovere il file di test
+        # it tries to remove the test file
         try:
             file = repo.get_contents("test.txt")
             repo.delete_file(file.path, "Removing test file", file.sha)
         except GithubException as e:
             if e.status == 404:
-                # Il file non esiste, ma è stato comunque rimosso con successo
                 pass
             else:
                 raise
@@ -60,17 +58,17 @@ def is_valid_github_token(token, repository_name):
         return False
 
 
-def retrive_repo(source, pesonal_key):
+def retrieve_repo(source, personal_key):
     url = f"https://api.github.com/users/{source}/repos"
-    headers = {"Authorization": f"Bearer {pesonal_key}"}
+    headers = {"Authorization": f"Bearer {personal_key}"}
 
-    risposta = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers)
 
-    if risposta.status_code == 200:
-        repo_pubblici = [repo["name"] for repo in risposta.json()]
-        return repo_pubblici
+    if response.status_code == 200:
+        public_repos = [repo["name"] for repo in response.json()]
+        return public_repos
     else:
-        print(f"Errore {risposta.status_code}: Impossibile ottenere la lista dei repository pubblici.")
+        print(f"Error {response.status_code}: Cannot retrieve a list of public repos.")
         return None
 
 
@@ -84,38 +82,38 @@ def download_readme(username, repo_name, token):
         readme_content = response.json()['content']
         readme_content = base64.b64decode(readme_content).decode('utf-8')
 
-        # Salva il README.md su disco
+        # save the README.md file
         with open(os.path.join("data", f"{repo_name}.md"), 'w', encoding='utf-8') as file:
             file.write(readme_content)
-        print(f"README.md per il repository {repo_name} scaricato e salvato.")
+        print(f"README.md of the {repo_name} repository downloaded and saved.")
     else:
         print(f"Failed to fetch README.md for {repo_name}. Status code: {response.status_code}")
 
 
 def find_image_references(readme_content):
-    # Utilizziamo un'espressione regolare per trovare tutti i riferimenti alle immagini
-    # Si suppone che i riferimenti abbiano la forma ![testo_alternativo](url_dell_immagine)
-    image_pattern = re.compile(r'!\[.*?\]\((.*?)\)')
+    # finding image references using regex
+    # the image reference should be like ![some_text](image_url)
+    image_pattern = re.compile(r'!\[.*?]\((.*?)\)')
 
-    # Trova tutti i riferimenti alle immagini nel README
+    # find all image reference in README file
     image_references = re.findall(image_pattern, readme_content)
 
     return image_references
 
 
 def download_images_from_github(image_urls, output_folder):
-    # Crea la cartella di output se non esiste già
+    # creating output folder
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     for img_url in image_urls:
-        # Estrarre il nome del file dall'URL
+        # getting the image url
         img_name = os.path.basename(img_url)
 
-        # Genera il percorso di destinazione
+        # building route to file
         img_destination = os.path.join(output_folder, img_name)
 
-        # Scarica l'immagine dalla URL di GitHub
+        # download image from GitHub
         response = requests.get(img_url, stream=True)
 
         if response.status_code == 200:
@@ -123,47 +121,48 @@ def download_images_from_github(image_urls, output_folder):
                 for chunk in response.iter_content(chunk_size=128):
                     file.write(chunk)
 
-            print(f"Immagine scaricata: {img_url}")
+            print(f"Image downloaded: {img_url}")
             return True
         else:
-            print(f"Errore durante il download dell'immagine {img_url}")
+            print(f"Error during the download {img_url}")
             return False
 
-def replace_image_path(mdFile, old_path, new_path):
-    with open(mdFile, 'r', encoding='utf-8') as file:
+
+def replace_image_path(md_file, old_path, new_path):
+    with open(md_file, 'r', encoding='utf-8') as file:
         content = file.read()
 
     content = re.sub(re.escape(old_path), new_path, content)
 
-    with open(mdFile, 'w', encoding='utf-8') as file:
+    with open(md_file, 'w', encoding='utf-8') as file:
         file.write(content)
 
-    print(f"Path dell'immagine {old_path} sostituito con {new_path}")
+    print(f"old path: {old_path} replaced by new path: {new_path}")
 
 
-def remove_license_section(mdFile):
-    with open(mdFile, 'r', encoding='utf-8') as file:
+def remove_license_section(md_file):
+    with open(md_file, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    # Cerca la posizione iniziale e finale della sezione della licenza
+    # finding the license section
     start_index = content.find("## License")
     end_index = content.find("]", start_index) + 1
 
-    # Rimuovi la sezione della licenza
+    # removing license
     if start_index != -1 and end_index != -1:
         content = content[:start_index] + content[end_index:]
 
-        # Sovrascrivi il file con il nuovo contenuto
-        with open(mdFile, 'w', encoding='utf-8') as file:
+        # saving the updated md file without license
+        with open(md_file, 'w', encoding='utf-8') as file:
             file.write(content)
 
-        print("Sezione della licenza rimossa con successo.")
+        print("License removed successfully.")
     else:
-        print("Sezione della licenza non trovata.")
+        print("The current file doesn't have any license.")
 
 
 def generate_head(file_name, open_ai_api_key):
-    print("Richiesta OpenAI in corso...")
+    print("Contacting OpenAI API...")
 
     client = OpenAI(
         # defaults to os.environ.get("OPENAI_API_KEY")
@@ -186,10 +185,13 @@ def generate_head(file_name, open_ai_api_key):
                                "\nREGOLE CHE DEVI SEGUIRE PER ESTRARRE I CAMPI:\n"
                                "1) Il titolo deve essere uno\n"
                                "2) La categoria deve essere una e deve riferirsi all'argomento generale del testo\n"
-                               "3) Le sottocategorie possono essere massimo 2 e devono essere argomenti trattati nel testo\n"
+                               "3) Le sottocategorie possono essere massimo 2 e devono essere argomenti"
+                               " trattati nel testo\n"
                                "4) I tag possono essere massimo 5\n"
-                               "5) NON AGGIUNGERE CAMPI CHE NON SONO FRA QUELLI RICHIESTI, e inserisci solo categorie, sottocategorie"
-                               "e tags che secondo te aiutano il lettore a capire di cosa si parla in maniera veloce\n\n"
+                               "5) NON AGGIUNGERE CAMPI CHE NON SONO FRA QUELLI RICHIESTI, e inserisci"
+                               " solo categorie, sottocategorie"
+                               "e tags che secondo te aiutano il lettore a capire"
+                               " di cosa si parla in maniera veloce\n\n"
                                "Testo:"
                                "\n\n"
                                f"{content}"
@@ -201,67 +203,77 @@ def generate_head(file_name, open_ai_api_key):
         json_text = json.loads(chat_completion.choices[0].message.content)
         with open(os.path.join("data", "heading", f"{new_file_name}.json"), "w", encoding="utf-8") as file:
             json.dump(json_text, file, indent=4)
-            print(f"File {new_file_name}.json creato con successo.")
+            print(f"File {new_file_name}.json created successfully.")
     except Exception as e:
         print(e)
 
+    # this is forced by the 3 RPM (request per minute) limitation of Open Ai API
     time.sleep(22)
 
 
-def markdown_heading_builder(json_data):
+def markdown_heading_builder(json_data, file_name):
     with open(json_data, "r", encoding="utf-8") as file:
         json_head = json.load(file)
 
     md_head = f"---" \
               f"\ntitle: {json_head['title']}" \
-              f"\ncategories: [{json_head['top categoria']},{json_head['']}]" \
+              f"\ncategory: [{json_head['category']},{json_head['']}]" \
+              f"\nsubcategories: {json_head['subcategories']}" \
+              f"\ntags: {json_head['tags']}" \
+              "\n---\n"
+    # TODO add the remaining categories
 
+    content = open(os.path.join("data", f"{file_name}.md"), "r", encoding="utf-8").read()
 
+    # to be tested
+    new_content = string.Formatter.format(md_head, content)
 
+    with open(os.path.join("data", f"{file_name}.md"), "w") as file:
+        file.write(new_content)
 
 
 def startup():
     if not os.path.exists("data"):
         os.mkdir("data")
 
-    CONFIG = os.path.join("data", "config.json")
+    __config = os.path.join("data", "config.json")
 
-    if os.path.isfile(CONFIG) and os.access(CONFIG, os.R_OK) and os.path.exists(CONFIG):
-        with open(CONFIG, 'r') as config_file:
-            dati_utente = json.load(config_file)
+    if os.path.isfile(__config) and os.access(__config, os.R_OK) and os.path.exists(__config):
+        with open(__config, 'r') as config_file:
+            user_data = json.load(config_file)
     else:
         while True:
-            account_name = input("Inserisci il tuo nome utente di GitHub: ")
+            account_name = input("Your GitHub username: ")
             if is_valid_github_username(account_name):
                 break
             else:
-                print("Nome utente di GitHub non valido. Riprova.")
+                print("The submitted GitHub name doesn't seem valid. Retry.")
 
         while True:
-            github_token = input("Inserisci il tuo token di GitHub: ")
+            github_token = input("Your GitHub access token: ")
             if is_valid_github_token(github_token, f"{account_name}.github.io"):
                 break
             else:
-                print("Token di GitHub non valido. Riprova.")
+                print("TThe submitted GitHub token doesn't seem valid. Retry.")
 
-        open_ai_api_key = input("Inserisci la tua API key di OpenAI: ")
+        open_ai_api_key = input("Your Open AI API key : ")
 
-        dati_utente = {
+        user_data = {
             "_AccountName": account_name,
             "_Token": github_token,
             "_OpenAIKey": open_ai_api_key
         }
 
-        with open(CONFIG, "w") as config_file:
-            json.dump(dati_utente, config_file)
+        with open(__config, "w") as config_file:
+            json.dump(user_data, config_file)
 
-    lista_repo = retrive_repo("softlab-unimore", dati_utente.get("_Token"))
+    lista_repo = retrieve_repo("softlab-unimore", user_data.get("_Token"))
 
     with open(os.path.join("data", "lista_repo.json"), "w") as lista_repo_file:
         json.dump(lista_repo, lista_repo_file)
 
     for repo in lista_repo:
-        download_readme("softlab-unimore", repo, dati_utente.get("_Token"))
+        download_readme("softlab-unimore", repo, user_data.get("_Token"))
         paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r", encoding="utf-8").read())
         for image in paths:
             if not (download_images_from_github(
@@ -273,12 +285,11 @@ def startup():
 
             replace_image_path(os.path.join("data", f"{repo}.md"), image, f"images/{os.path.basename(image)}")
         remove_license_section(os.path.join("data", f"{repo}.md"))
-        generate_head(repo, dati_utente.get("_OpenAIKey"))
+        generate_head(repo, user_data.get("_OpenAIKey"))
         # markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"))
 
 
 if __name__ == "__main__":
-
 
     # print(chat_completion.choices[0].message.content)
 
@@ -297,7 +308,7 @@ if __name__ == "__main__":
             if should_exit:
                 break
             else:
-                # chiudi il thread
+                # closing the thread
                 startup()
     print("Exited.")
 
