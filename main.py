@@ -149,7 +149,9 @@ def replace_image_path(md_file, old_path, new_path):
     with open(md_file, 'r') as file:
         content = file.read()
 
-    content = re.sub(re.escape(old_path), new_path, content)
+    # new_path = "_posts" + new_path
+    # content = re.sub(re.escape(old_path), new_path, content)
+    content = str(content).replace(old_path, new_path)
 
     with open(md_file, 'w') as file:
         file.write(content)
@@ -238,7 +240,7 @@ def markdown_heading_builder(json_data, file_name, date):
                   f"\ndate: {date}" \
                   f"\ncategory: [{json_head['category']}]" \
                   f"\nsubcategories: [{', '.join(json_head['subcategory'])}]" \
-                  f"\ntags: [{', '.join(tag.lower() for tag in json_head['tags'])}]" \
+                  f"\ntags: [{', '.join(str(tag.lower()).replace('-', ' ') for tag in json_head['tags'])}]" \
                   "\n---\n\n"
         # TODO add the remaining categories
     except Exception as e:
@@ -247,7 +249,7 @@ def markdown_heading_builder(json_data, file_name, date):
                   f"\ntitle: {str(json_head['title']).replace(':', ';')}" \
                   f"\ndate: {date}" \
                   f"\ncategory: [{json_head['category']}]" \
-                  f"\nsubcategories: [{', '.join(json_head['subcategories'])}]" \
+                  f"\nsubcategories: [{','.join(json_head['subcategories'])}]" \
                   f"\ntags: [{', '.join(str(tag.lower()).replace('-', ' ') for tag in json_head['tags'])}]" \
                   "\n---\n\n"
 
@@ -356,7 +358,7 @@ def startup():
                     [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
                     os.path.join("data", "images"))
 
-            replace_image_path(os.path.join("data", f"{repo}.md"), image, f"data/images/{os.path.basename(image)}")
+            replace_image_path(os.path.join("data", f"{repo}.md"), image, f"images/{os.path.basename(image)}")
         remove_license_section(os.path.join("data", f"{repo}.md"))
         # generate_head(repo, user_data.get("_OpenAIKey"))
         markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
