@@ -255,7 +255,8 @@ def markdown_heading_builder(json_data, file_name, date):
 
     # to be tested
     new_content = md_head + content
-    new_content = str(new_content).replace('–', '-')
+    new_content = str(new_content).replace('–', '-').replace('’', "'").replace('“', '"').replace('”', '"').replace(
+        '‘', "'").replace('…', '...').replace('—', '-').replace('–', '-').replace('´', "'")
 
     tmp_date = datetime.strptime(date, '%d-%m-%Y %H:%M:%S %z')
     date_file_naming = tmp_date.strftime('%Y-%m-%d')
@@ -355,7 +356,7 @@ def startup():
                     [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
                     os.path.join("data", "images"))
 
-            replace_image_path(os.path.join("data", f"{repo}.md"), image, f"images/{os.path.basename(image)}")
+            replace_image_path(os.path.join("data", f"{repo}.md"), image, f"data/images/{os.path.basename(image)}")
         remove_license_section(os.path.join("data", f"{repo}.md"))
         # generate_head(repo, user_data.get("_OpenAIKey"))
         markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
@@ -363,7 +364,7 @@ def startup():
         tmp_date = datetime.strptime(project_date, '%d-%m-%Y %H:%M:%S %z')
         date_path = tmp_date.strftime('%Y-%m-%d')
 
-        # gitUploader(user_data, f"{date_path}-{repo}")
+        gitUploader(user_data, f"{date_path}-{repo}")
 
 
 if __name__ == "__main__":
