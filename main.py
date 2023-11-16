@@ -149,6 +149,8 @@ def replace_image_path(md_file, old_path, new_path):
     with open(md_file, 'r') as file:
         content = file.read()
 
+    print(f"DEBUG: OLD PATH: {old_path}")
+
     # new_path = "_posts" + new_path
     # content = re.sub(re.escape(old_path), new_path, content)
     content = str(content).replace(old_path, new_path)
@@ -351,14 +353,16 @@ def startup():
         project_date = download_readme("softlab-unimore", repo, user_data.get("_Token"))
         paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
         for image in paths:
+            new_path = f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}"
             if not (download_images_from_github(
                     [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}" for image in paths],
                     os.path.join("data", "images"))):
+                new_path = f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}"
                 download_images_from_github(
                     [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
                     os.path.join("data", "images"))
 
-            replace_image_path(os.path.join("data", f"{repo}.md"), image, f"images/{os.path.basename(image)}")
+            replace_image_path(os.path.join("data", f"{repo}.md"), image, new_path)
         remove_license_section(os.path.join("data", f"{repo}.md"))
         # generate_head(repo, user_data.get("_OpenAIKey"))
         markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
