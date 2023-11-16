@@ -59,7 +59,6 @@ def is_valid_github_token(token, repository_name):
         print(e)
         return False
 
-
 def retrieve_repo(source, personal_key):
     url = f"https://api.github.com/users/{source}/repos"
     headers = {"Authorization": f"Bearer {personal_key}"}
@@ -308,7 +307,6 @@ def gitUploader(dati_utente, md_file):
         print(f"File {md_file} aggiornato su GitHub.")
 
 
-
 def startup():
     if not os.path.exists("data"):
         os.mkdir("data")
@@ -374,9 +372,6 @@ def startup():
 
 
 if __name__ == "__main__":
-
-    # print(chat_completion.choices[0].message.content)
-
     # drive.mount('/content/drive')
     input_thread = threading.Thread(target=user_input_thread)
     should_exit = False
