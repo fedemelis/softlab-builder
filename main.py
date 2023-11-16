@@ -269,42 +269,44 @@ def markdown_heading_builder(json_data, file_name, date):
 
 
 def gitUploader(dati_utente, md_file):
-    # Ottieni un'istanza di GitHub usando il token
-    g = Github(dati_utente.get("_Token"))
 
-    sha = None
+    if not md_file.__contains__("SBDIO"):
+        # Ottieni un'istanza di GitHub usando il token
+        g = Github(dati_utente.get("_Token"))
 
-    repo_name = dati_utente.get("_AccountName") + ".github.io"
-    repo = g.get_user().get_repo(repo_name)
+        sha = None
 
-    try:
-        # Prova a ottenere il contenuto del file <mdfile>.md
-        file = repo.get_contents(f"_posts/{md_file}.md")
-        sha = file.sha
-        print(f"Il file {md_file} esiste su GitHub.")
-    except Exception as e:
-        # Se il file non esiste, crealo
-        if "404" in str(e):
-            with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
-                file_content_str = file_content.read()
-                repo.create_file(f"_posts/{md_file}.md", "Initial file", file_content_str)
-            print(f"File {md_file} creato su GitHub.")
+        repo_name = dati_utente.get("_AccountName") + ".github.io"
+        repo = g.get_user().get_repo(repo_name)
 
-            with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
-                file = repo.get_contents(f"_posts/{md_file}.md")
-                sha = file.sha
-                file_content_str = file_content.read()
-                repo.update_file(f"_posts/{md_file}.md", "automatic update", file_content_str, sha)
-                print(f"File {md_file} aggiornato su GitHub.")
-                return
+        try:
+            # Prova a ottenere il contenuto del file <mdfile>.md
+            file = repo.get_contents(f"_posts/{md_file}.md")
+            sha = file.sha
+            print(f"Il file {md_file} esiste su GitHub.")
+        except Exception as e:
+            # Se il file non esiste, crealo
+            if "404" in str(e):
+                with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
+                    file_content_str = file_content.read()
+                    repo.create_file(f"_posts/{md_file}.md", "Initial file", file_content_str)
+                print(f"File {md_file} creato su GitHub.")
 
-    # Se il file esiste, aggiorna il contenuto
-    with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
-        file = repo.get_contents(f"_posts/{md_file}.md")
-        sha = file.sha
-        file_content_str = file_content.read()
-        repo.update_file(f"_posts/{md_file}.md", "automatic update", file_content_str, sha)
-        print(f"File {md_file} aggiornato su GitHub.")
+                with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
+                    file = repo.get_contents(f"_posts/{md_file}.md")
+                    sha = file.sha
+                    file_content_str = file_content.read()
+                    repo.update_file(f"_posts/{md_file}.md", "automatic update", file_content_str, sha)
+                    print(f"File {md_file} aggiornato su GitHub.")
+                    return
+
+        # Se il file esiste, aggiorna il contenuto
+        with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
+            file = repo.get_contents(f"_posts/{md_file}.md")
+            sha = file.sha
+            file_content_str = file_content.read()
+            repo.update_file(f"_posts/{md_file}.md", "automatic update", file_content_str, sha)
+            print(f"File {md_file} aggiornato su GitHub.")
 
 
 def startup():
@@ -329,7 +331,7 @@ def startup():
             if is_valid_github_token(github_token, f"{account_name}.github.io"):
                 break
             else:
-                print("TThe submitted GitHub token doesn't seem valid. Retry.")
+                print("The submitted GitHub token doesn't seem valid. Retry.")
 
         open_ai_api_key = input("Your Open AI API key : ")
 
@@ -349,6 +351,7 @@ def startup():
 
     for repo in lista_repo:
         project_date = download_readme("softlab-unimore", repo, user_data.get("_Token"))
+        print(f"PROJECT DATE: {project_date}")
         paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
         for image in paths:
             new_path = f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}"
