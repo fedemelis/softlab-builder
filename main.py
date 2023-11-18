@@ -59,6 +59,7 @@ def is_valid_github_token(token, repository_name):
         print(e)
         return False
 
+
 def retrieve_repo(source, personal_key):
     url = f"https://api.github.com/users/{source}/repos"
     headers = {"Authorization": f"Bearer {personal_key}"}
@@ -221,6 +222,11 @@ def generate_head(file_name, open_ai_api_key):
             model="gpt-3.5-turbo-16k",
         )
         json_text = json.loads(chat_completion.choices[0].message.content)
+
+        # if the heading folder doesn't exist, create it
+        if not os.path.exists(os.path.join("data", "heading")):
+            os.mkdir(os.path.join("data", "heading"))
+
         with open(os.path.join("data", "heading", f"{new_file_name}.json"), "w") as file:
             json.dump(json_text, file, indent=4)
             print(f"File {new_file_name}.json created successfully.")
@@ -243,7 +249,6 @@ def markdown_heading_builder(json_data, file_name, date):
                   f"\nsubcategories: [{', '.join(json_head['subcategory'])}]" \
                   f"\ntags: [{', '.join(str(tag.lower()).replace('-', ' ') for tag in json_head['tags'])}]" \
                   "\n---\n\n"
-        # TODO add the remaining categories
     except Exception as e:
         print(e)
         md_head = f"---" \
@@ -269,7 +274,6 @@ def markdown_heading_builder(json_data, file_name, date):
 
 
 def gitUploader(dati_utente, md_file):
-
     if not md_file.__contains__("SBDIO"):
         # Ottieni un'istanza di GitHub usando il token
         g = Github(dati_utente.get("_Token"))
@@ -312,7 +316,6 @@ def gitUploader(dati_utente, md_file):
 # crating about.md section and uploading it to GitHub repo in _tabs/about.md
 
 def about_md_creator(dati_utente):
-
     # se il file about.md non esiste, crealo
     if not os.path.isfile(os.path.join("data", "about.md")):
         with open(os.path.join("data", "about.md"), "w") as file_content:
@@ -365,8 +368,6 @@ def about_md_creator(dati_utente):
         print(f"File about.md aggiornato su GitHub.")
 
 
-
-
 def startup():
     if not os.path.exists("data"):
         os.mkdir("data")
@@ -410,6 +411,8 @@ def startup():
         json.dump(lista_repo, lista_repo_file)
 
     for repo in lista_repo:
+        generate_head(repo, user_data.get("_OpenAIKey"))
+        break
         project_date = download_readme("softlab-unimore", repo, user_data.get("_Token"))
         print(f"PROJECT DATE: {project_date}")
         paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
@@ -436,7 +439,6 @@ def startup():
 
 if __name__ == "__main__":
     # drive.mount('/content/drive')
-
 
     input_thread = threading.Thread(target=user_input_thread)
     should_exit = False
