@@ -225,7 +225,7 @@ def generate_head(file_name, open_ai_api_key):
             json.dump(json_text, file, indent=4)
             print(f"File {new_file_name}.json created successfully.")
     except Exception as e:
-        print(e)
+        print("DEBUG: " + str(e))
 
     # this is forced by the 3 RPM (request per minute) limitation of Open Ai API
     time.sleep(22)
@@ -309,6 +309,64 @@ def gitUploader(dati_utente, md_file):
             print(f"File {md_file} aggiornato su GitHub.")
 
 
+# crating about.md section and uploading it to GitHub repo in _tabs/about.md
+
+def about_md_creator(dati_utente):
+
+    # se il file about.md non esiste, crealo
+    if not os.path.isfile(os.path.join("data", "about.md")):
+        with open(os.path.join("data", "about.md"), "w") as file_content:
+            file_content_str = "## About\n\n"
+            file_content.write(file_content_str)
+
+    # Ottieni un'istanza di GitHub usando il token
+    heading = ("---\n"
+               "icon: fas fa-info-circle\n"
+               "order: 4\n"
+               "---\n\n")
+
+    g = Github(dati_utente.get("_Token"))
+
+    sha = None
+
+    repo_name = dati_utente.get("_AccountName") + ".github.io"
+    repo = g.get_user().get_repo(repo_name)
+
+    try:
+        # Prova a ottenere il contenuto del file about.md
+        file = repo.get_contents("_tabs/about.md")
+        sha = file.sha
+        print(f"Il file about.md esiste su GitHub.")
+    except Exception as e:
+        # Se il file non esiste, crealo
+        if "404" in str(e):
+            with open(os.path.join("data", f"about.md"), "r") as file_content:
+                file_content_str = file_content.read()
+                abt = heading + file_content_str
+                repo.create_file("_tabs/about.md", "Initial file", abt)
+            print(f"File about.md creato su GitHub.")
+
+            with open(os.path.join("data", f"about.md"), "r") as file_content:
+                file = repo.get_contents("_tabs/about.md")
+                sha = file.sha
+                file_content_str = file_content.read()
+                abt = heading + file_content_str
+                repo.update_file("_tabs/about.md", "automatic update", abt, sha)
+                print(f"File about.md aggiornato su GitHub.")
+                return
+
+    # Se il file esiste, aggiorna il contenuto
+    with open(os.path.join("data", f"about.md"), "r") as file_content:
+        file = repo.get_contents("_tabs/about.md")
+        sha = file.sha
+        file_content_str = file_content.read()
+        abt = heading + file_content_str
+        repo.update_file("_tabs/about.md", "automatic update", abt, sha)
+        print(f"File about.md aggiornato su GitHub.")
+
+
+
+
 def startup():
     if not os.path.exists("data"):
         os.mkdir("data")
@@ -344,6 +402,8 @@ def startup():
         with open(__config, "w") as config_file:
             json.dump(user_data, config_file)
 
+    about_md_creator(user_data)
+
     lista_repo = retrieve_repo("softlab-unimore", user_data.get("_Token"))
 
     with open(os.path.join("data", "lista_repo.json"), "w") as lista_repo_file:
@@ -365,7 +425,7 @@ def startup():
 
             replace_image_path(os.path.join("data", f"{repo}.md"), image, new_path)
         remove_license_section(os.path.join("data", f"{repo}.md"))
-        # generate_head(repo, user_data.get("_OpenAIKey"))
+        generate_head(repo, user_data.get("_OpenAIKey"))
         markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
 
         tmp_date = datetime.strptime(project_date, '%d-%m-%Y %H:%M:%S %z')
@@ -376,6 +436,8 @@ def startup():
 
 if __name__ == "__main__":
     # drive.mount('/content/drive')
+
+
     input_thread = threading.Thread(target=user_input_thread)
     should_exit = False
     first_exec = True
