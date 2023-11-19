@@ -74,10 +74,31 @@ def retrieve_repo(source, personal_key):
         return None
 
 
+
+def get_first_commit_date(repo_url, token):
+    try:
+        # Crea un oggetto GitHub con la tua chiave di accesso o token (se necessario)
+        g = Github(token)
+
+        # Ottenere l'oggetto Repository dal suo URL
+        repo = g.get_repo(repo_url)
+
+        # Ottieni il primo commit
+        first_commit = repo.get_commits()[0]
+
+        # Restituisci la data del primo commit
+        return first_commit.commit.author.date.strftime('%d-%m-%Y %H:%M:%S +0100')
+
+    except GithubException as e:
+        print(f"Errore durante l'accesso al repository: {e}")
+        return None
+
+
 def download_readme(username, repo_name, token):
     readme_url = f'https://api.github.com/repos/{username}/{repo_name}/readme'
     repo_url = f'https://api.github.com/repos/{username}/{repo_name}'
     headers = {'Authorization': f'Bearer {token}'}
+    upd = False
 
     # Fetch README
     readme_response = requests.get(readme_url, headers=headers)
@@ -89,22 +110,29 @@ def download_readme(username, repo_name, token):
         # Fetch Repository info
         repo_response = requests.get(repo_url, headers=headers)
         if repo_response.status_code == 200:
-            last_updated = repo_response.json()['updated_at']
-            last_updated = datetime.strptime(last_updated, '%Y-%m-%dT%H:%M:%SZ')
-            # Convert last_updated to string
-            last_updated = last_updated.strftime('%d-%m-%Y %H:%M:%S')
-            last_updated += " +0100"
-
             # Save the README.md file
-            with open(os.path.join("data", f"{repo_name}.md"), 'w') as file:
-                file.write(readme_content)
-            print(f"README.md of the {repo_name} repository downloaded and saved.")
+            if os.path.exists(os.path.join("data", f"{repo_name}.md")):
+                with open(os.path.join("data", f"{repo_name}.md"), 'r') as old_file:
+                    old_content = old_file.read()
+                    if old_content != readme_content:
+                        upd = True
+                        with open(os.path.join("data", f"{repo_name}.md"), 'w') as file:
+                            file.write(readme_content)
+                            upd = True
+                            print(f"README.md of the {repo_name} repository successfullyy updated.")
+                    else:
+                        print(f"README.md of the {repo_name} repository is up to date.")
+            else:
+                with open(os.path.join("data", f"{repo_name}.md"), 'w') as file:
+                    file.write(readme_content)
+                    upd = True
+                    print(f"README.md of the {repo_name} repository downloaded and saved.")
         else:
             print(f"Failed to fetch repository info for {repo_name}. Status code: {repo_response.status_code}")
     else:
         print(f"Failed to fetch README.md for {repo_name}. Status code: {readme_response.status_code}")
 
-    return last_updated
+    return upd
 
 
 def find_image_references(readme_content):
@@ -145,7 +173,7 @@ def download_images_from_github(image_urls, output_folder):
             return False
 
 
-def replace_image_path(md_file, old_path, new_path):
+def replace_image_path(md_file, edited_md_file, old_path, new_path):
     with open(md_file, 'r') as file:
         content = file.read()
 
@@ -155,13 +183,19 @@ def replace_image_path(md_file, old_path, new_path):
     # content = re.sub(re.escape(old_path), new_path, content)
     content = str(content).replace(old_path, new_path)
 
-    with open(md_file, 'w') as file:
+    with open(edited_md_file, 'w') as file:
         file.write(content)
 
     print(f"old path: {old_path} replaced by new path: {new_path}")
 
 
-def remove_license_section(md_file):
+def remove_license_section(md_file, original_md_file):
+    if not os.path.exists(md_file):
+        with open(original_md_file, 'r') as file:
+            content = file.read()
+            with open(md_file, 'w') as file:
+                file.write(content)
+
     with open(md_file, 'r') as file:
         content = file.read()
 
@@ -201,8 +235,8 @@ def generate_head(file_name, open_ai_api_key):
                     "content": f"Estrapola dal seguente testo i seguenti campi, e forniscili in formato json:\n\n"
                                "title"
                                "category"
-                               "subcategory"
-                               "tags"
+                               "subcategory [...]"
+                               "tags [...]"
                                "\nREGOLE CHE DEVI SEGUIRE PER ESTRARRE I CAMPI:\n"
                                "1) Il titolo deve essere uno\n"
                                "2) La categoria deve essere una e deve riferirsi all'argomento generale del testo\n"
@@ -239,7 +273,6 @@ def generate_head(file_name, open_ai_api_key):
 
 def markdown_heading_builder(json_data, file_name, date):
     with open(json_data, "r") as file:
-
         json_head = json.load(file)
     try:
         md_head = f"---" \
@@ -259,7 +292,7 @@ def markdown_heading_builder(json_data, file_name, date):
                   f"\ntags: [{', '.join(str(tag.lower()).replace('-', ' ') for tag in json_head['tags'])}]" \
                   "\n---\n\n"
 
-    content = open(os.path.join("data", f"{file_name}.md"), "r").read()
+    content = open(os.path.join("data", f"{file_name}-edit.md"), "r").read()
 
     # to be tested
     new_content = md_head + content
@@ -295,6 +328,7 @@ def gitUploader(dati_utente, md_file):
                     file_content_str = file_content.read()
                     repo.create_file(f"_posts/{md_file}.md", "Initial file", file_content_str)
                 print(f"File {md_file} creato su GitHub.")
+                time.sleep(5)
 
                 with open(os.path.join("data", f"{md_file}.md"), "r") as file_content:
                     file = repo.get_contents(f"_posts/{md_file}.md")
@@ -451,37 +485,36 @@ def startup():
         json.dump(lista_repo, lista_repo_file)
 
     for repo in lista_repo:
-        project_date = download_readme("softlab-unimore", repo, user_data.get("_Token"))
-        print(f"PROJECT DATE: {project_date}")
-        paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
-        for image in paths:
-            new_path = f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}"
-            if not (download_images_from_github(
-                    [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}" for image in paths],
-                    os.path.join("data", "images"))):
-                new_path = f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}"
-                download_images_from_github(
-                    [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
-                    os.path.join("data", "images"))
+        if download_readme("softlab-unimore", repo, user_data.get("_Token")):
+            project_date = get_first_commit_date(f"softlab-unimore/{repo}", user_data.get("_Token"))
+            print(f"PROJECT DATE: {project_date}")
+            paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
+            for image in paths:
+                new_path = f"/assets/images/{os.path.basename(image)}"
+                if not (download_images_from_github(
+                        [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}" for image in paths],
+                        os.path.join("data", "images"))):
+                    download_images_from_github(
+                        [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
+                        os.path.join("data", "images"))
 
-            upload_images(user_data, os.path.basename(image))
+                upload_images(user_data, os.path.basename(image))
 
-            # TODO: fix image path replacement, with relative path (assets/images/...)
+                # TODO: fix image path replacement, with relative path (assets/images/...)
 
-            replace_image_path(os.path.join("data", f"{repo}.md"), image, new_path)
-        remove_license_section(os.path.join("data", f"{repo}.md"))
-        # generate_head(repo, user_data.get("_OpenAIKey"))
-        markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
+                replace_image_path(os.path.join("data", f"{repo}.md"), os.path.join("data", f"{repo}-edit.md"),  image, new_path)
+            remove_license_section(os.path.join("data", f"{repo}-edit.md"), os.path.join("data", f"{repo}.md"))
+            generate_head(repo, user_data.get("_OpenAIKey"))
+            markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
 
-        tmp_date = datetime.strptime(project_date, '%d-%m-%Y %H:%M:%S %z')
-        date_path = tmp_date.strftime('%Y-%m-%d')
+            tmp_date = datetime.strptime(project_date, '%d-%m-%Y %H:%M:%S %z')
+            date_path = tmp_date.strftime('%Y-%m-%d')
 
-        # gitUploader(user_data, f"{date_path}-{repo}")
+            gitUploader(user_data, f"{date_path}-{repo}")
 
 
 if __name__ == "__main__":
     # drive.mount('/content/drive')
-
     input_thread = threading.Thread(target=user_input_thread)
     should_exit = False
     first_exec = True
