@@ -368,6 +368,46 @@ def about_md_creator(dati_utente):
         print(f"File about.md aggiornato su GitHub.")
 
 
+# upload images in GitHub asset/images
+def upload_images(dati_utente, image_name):
+    # Ottieni un'istanza di GitHub usando il token
+    g = Github(dati_utente.get("_Token"))
+
+    sha = None
+
+    repo_name = dati_utente.get("_AccountName") + ".github.io"
+    repo = g.get_user().get_repo(repo_name)
+
+    try:
+        # Prova a ottenere il contenuto del file <mdfile>.md
+        file = repo.get_contents(f"assets/images/{image_name}")
+        sha = file.sha
+        print(f"Il file {image_name} esiste su GitHub.")
+    except Exception as e:
+        # Se il file non esiste, crealo
+        if "404" in str(e):
+            with open(os.path.join("data", f"images/{image_name}"), "rb") as file_content:
+                file_content_str = file_content.read()
+                repo.create_file(f"assets/images/{image_name}", "Initial file", file_content_str)
+            print(f"File {image_name} creato su GitHub.")
+
+            with open(os.path.join("data", f"images/{image_name}"), "rb") as file_content:
+                file = repo.get_contents(f"assets/images/{image_name}")
+                sha = file.sha
+                file_content_str = file_content.read()
+                repo.update_file(f"assets/images/{image_name}", "automatic update", file_content_str, sha)
+                print(f"File {image_name} aggiornato su GitHub.")
+                return
+
+    # Se il file esiste, aggiorna il contenuto
+    with open(os.path.join("data", f"images/{image_name}"), "rb") as file_content:
+        file = repo.get_contents(f"assets/images/{image_name}")
+        sha = file.sha
+        file_content_str = file_content.read()
+        repo.update_file(f"assets/images/{image_name}", "automatic update", file_content_str, sha)
+        print(f"File {image_name} aggiornato su GitHub.")
+
+
 def startup():
     if not os.path.exists("data"):
         os.mkdir("data")
@@ -411,8 +451,6 @@ def startup():
         json.dump(lista_repo, lista_repo_file)
 
     for repo in lista_repo:
-        generate_head(repo, user_data.get("_OpenAIKey"))
-        break
         project_date = download_readme("softlab-unimore", repo, user_data.get("_Token"))
         print(f"PROJECT DATE: {project_date}")
         paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
@@ -426,15 +464,19 @@ def startup():
                     [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
                     os.path.join("data", "images"))
 
+            upload_images(user_data, os.path.basename(image))
+
+            # TODO: fix image path replacement, with relative path (assets/images/...)
+
             replace_image_path(os.path.join("data", f"{repo}.md"), image, new_path)
         remove_license_section(os.path.join("data", f"{repo}.md"))
-        generate_head(repo, user_data.get("_OpenAIKey"))
+        # generate_head(repo, user_data.get("_OpenAIKey"))
         markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
 
         tmp_date = datetime.strptime(project_date, '%d-%m-%Y %H:%M:%S %z')
         date_path = tmp_date.strftime('%Y-%m-%d')
 
-        gitUploader(user_data, f"{date_path}-{repo}")
+        # gitUploader(user_data, f"{date_path}-{repo}")
 
 
 if __name__ == "__main__":
