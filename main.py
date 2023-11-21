@@ -74,7 +74,6 @@ def retrieve_repo(source, personal_key):
         return None
 
 
-
 def get_first_commit_date(repo_url, token):
     try:
         # Crea un oggetto GitHub con la tua chiave di accesso o token (se necessario)
@@ -443,6 +442,9 @@ def upload_images(dati_utente, image_name):
 
 
 def startup():
+
+    ### TODO: manage the initial folder hierarchy creation
+
     if not os.path.exists("data"):
         os.mkdir("data")
 
@@ -502,7 +504,8 @@ def startup():
 
                 # TODO: fix image path replacement, with relative path (assets/images/...)
 
-                replace_image_path(os.path.join("data", f"{repo}.md"), os.path.join("data", f"{repo}-edit.md"),  image, new_path)
+                replace_image_path(os.path.join("data", f"{repo}.md"), os.path.join("data", f"{repo}-edit.md"), image,
+                                   new_path)
             remove_license_section(os.path.join("data", f"{repo}-edit.md"), os.path.join("data", f"{repo}.md"))
             generate_head(repo, user_data.get("_OpenAIKey"))
             markdown_heading_builder(os.path.join("data", "heading", f"{repo}.json"), repo, project_date)
