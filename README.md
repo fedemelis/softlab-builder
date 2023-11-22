@@ -23,7 +23,7 @@ istruzioni riportate nella [guida del template](https://chirpy.cotes.page/posts/
     - Nome utente github
     - Token di accesso di GitHub (generabile da [qui](https://github.com/settings/tokens))
     - Token API di OpenAI (generabile da [qui](https://platform.openai.com/api-keys))
-      - **Warning**:
+     - > **Warning**:
        Si presti attenzione al plan di OpenAI. Le richieste all'API hanno un costo in base ai token utilizzati.
        Con un credito di 5$ si possono effettuare circa PIù di 5000 richieste all'API che corrispondono a 5000 
        aggiornamenti dei readme. Se si suppone di aggiornare un README con una media di 1 aggiornamento ogni 2
