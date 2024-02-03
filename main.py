@@ -74,16 +74,17 @@ def startup():
             print(f"PROJECT DATE: {project_date}")
             paths = find_image_references(open(os.path.join("data", f"{repo}.md"), "r").read())
             for image in paths:
-                new_path = f"/assets/images/{os.path.basename(image)}"
-                if not (download_images_from_github(
-                        [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}" for image in paths],
-                        os.path.join("data", "images"))):
-                    download_images_from_github(
-                        [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
-                        os.path.join("data", "images"))
+                if not image.startswith("http"):
+                    new_path = f"/assets/images/{os.path.basename(image)}"
+                    if not (download_images_from_github(
+                            [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/main/{image}" for image in paths],
+                            os.path.join("data", "images"))):
+                        download_images_from_github(
+                            [f"https://raw.githubusercontent.com/softlab-unimore/{repo}/master/{image}" for image in paths],
+                            os.path.join("data", "images"))
 
-                upload_images(user_data, os.path.basename(image))
-                replace_image_path(os.path.join("data", f"{repo}.md"), os.path.join("data", f"{repo}-edit.md"), image,
+                    upload_images(user_data, os.path.basename(image))
+                    replace_image_path(os.path.join("data", f"{repo}.md"), os.path.join("data", f"{repo}-edit.md"), image,
                                    new_path)
             remove_license_section(os.path.join("data", f"{repo}-edit.md"), os.path.join("data", f"{repo}.md"))
             ai_form_matter(repo, user_data.get("_OpenAIKey"))
